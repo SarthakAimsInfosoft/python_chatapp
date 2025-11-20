@@ -1,7 +1,8 @@
 fastapi
 uvicorn
-python-dotenv
 pydantic
-passlib[bcrypt]
-python-jose
+pymongo
 motor
+python-dotenv
+bcrypt==3.2.2
+passlib[bcrypt]==1.7.4
