@@ -10,7 +10,7 @@ connected_clients = {}
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://your-frontend-url.onrender.com"],
+    allow_origins=["https://python-chatapp-xiny.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,3 +93,8 @@ async def websocket_chat(websocket: WebSocket, username: str):
 @app.get("/online/{username}")
 async def check_online(username: str):
     return { "username": username, "online": username in connected_clients }
+
+
+@app.get("/")
+async def root():
+    return {"message": "FastAPI backend is running!"}
