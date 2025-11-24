@@ -83,29 +83,37 @@ async def check_online(username: str):
 async def websocket_chat(websocket: WebSocket, username: str):
     origin = websocket.headers.get("origin")
 
-    # Validate origin
     if not is_allowed_ws_origin(origin):
-        await websocket.close(code=1008)  # Policy violation
+        await websocket.close(code=1008)
         return
 
     await websocket.accept()
+
+    # Announce online user
     connected_clients[username] = websocket
+
+    # Notify everyone
+    for user, ws in connected_clients.items():
+        if user != username:
+            await ws.send_json({"type": "user_online", "username": username})
+
+    # Send current online users to the new user
+    await websocket.send_json({
+        "type": "online_users",
+        "users": list(connected_clients.keys())
+    })
 
     try:
         while True:
             data = await websocket.receive_json()
             event_type = data.get("type")
 
-            # -----------------------------
-            # Handle message event
-            # -----------------------------
             if event_type == "message":
                 msg_id = data["id"]
                 text = data["text"]
                 receiver = data["receiver"]
 
                 if receiver in connected_clients:
-                    # Send message to receiver
                     await connected_clients[receiver].send_json({
                         "type": "message",
                         "id": msg_id,
@@ -114,27 +122,22 @@ async def websocket_chat(websocket: WebSocket, username: str):
                         "receiver": receiver,
                         "status": "sent",
                     })
-                    # Send delivered status to sender
+
                     await websocket.send_json({
                         "type": "status",
                         "id": msg_id,
                         "status": "delivered",
                     })
                 else:
-                    # Receiver offline → mark as sent
                     await websocket.send_json({
                         "type": "status",
                         "id": msg_id,
                         "status": "sent",
                     })
 
-            # -----------------------------
-            # Handle seen event
-            # -----------------------------
-            if event_type == "seen":
+            elif event_type == "seen":
                 sender = data["sender"]
                 msg_id = data["id"]
-
                 if sender in connected_clients:
                     await connected_clients[sender].send_json({
                         "type": "seen",
@@ -143,5 +146,13 @@ async def websocket_chat(websocket: WebSocket, username: str):
 
     except WebSocketDisconnect:
         pass
+
     finally:
+        # Cleanup when user disconnects
         connected_clients.pop(username, None)
+        for user, ws in connected_clients.items():
+            await ws.send_json({
+                "type": "user_offline",
+                "username": username
+            })
+
