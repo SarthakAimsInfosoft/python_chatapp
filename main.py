@@ -88,20 +88,10 @@ async def websocket_chat(websocket: WebSocket, username: str):
         return
 
     await websocket.accept()
-
-    # Announce online user
     connected_clients[username] = websocket
 
-    # Notify everyone
-    for user, ws in connected_clients.items():
-        if user != username:
-            await ws.send_json({"type": "user_online", "username": username})
-
-    # Send current online users to the new user
-    await websocket.send_json({
-        "type": "online_users",
-        "users": list(connected_clients.keys())
-    })
+    # Notify all clients: user list updated
+    await broadcast_online_users()
 
     try:
         while True:
@@ -135,9 +125,10 @@ async def websocket_chat(websocket: WebSocket, username: str):
                         "status": "sent",
                     })
 
-            elif event_type == "seen":
+            if event_type == "seen":
                 sender = data["sender"]
                 msg_id = data["id"]
+
                 if sender in connected_clients:
                     await connected_clients[sender].send_json({
                         "type": "seen",
@@ -146,13 +137,20 @@ async def websocket_chat(websocket: WebSocket, username: str):
 
     except WebSocketDisconnect:
         pass
-
     finally:
-        # Cleanup when user disconnects
+        # Remove from online list
         connected_clients.pop(username, None)
-        for user, ws in connected_clients.items():
-            await ws.send_json({
-                "type": "user_offline",
-                "username": username
-            })
+        # Update all users
+        await broadcast_online_users()
 
+
+# -----------------------------------------
+# Helper: Broadcast Updated Online List
+# -----------------------------------------
+async def broadcast_online_users():
+    user_list = list(connected_clients.keys())
+    for client in connected_clients.values():
+        await client.send_json({
+            "type": "online_users",
+            "users": user_list
+        })
