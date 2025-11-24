@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from database import db
 from auth import hash_password, verify_password, create_access_token
 from schemas import UserCreate
@@ -12,7 +13,8 @@ connected_clients = {}
 # Allowed origins
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://chat-frontend-rob9.onrender.com"
+    "https://chat-frontend-rob9.onrender.com",
+    "https://python-chatapp-xiny.onrender.com"
 ]
 
 # Add CORS middleware
@@ -24,13 +26,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=[
+        "python-chatapp-xiny.onrender.com",
+        "*.onrender.com",
+        "localhost",
+        "127.0.0.1"
+    ]
+)
+
 def is_allowed_ws_origin(origin: str) -> bool:
     if not origin:
         return False
     if origin in ALLOWED_ORIGINS:
         return True
-    # Allow any Render subdomain if needed
-    if re.match(r"https://.*\.onrender\.com$", origin):
+    if re.match(r"https?://.*\.onrender\.com$", origin):
         return True
     return False
 
